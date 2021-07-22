@@ -5,17 +5,12 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/thomasschuiki/learn-go-echo/models"
 	bolt "go.etcd.io/bbolt"
 )
 
 var userBucket = []byte("users")
 var db *bolt.DB
-
-type User struct {
-	id       int
-	name     string
-	password string
-}
 
 func Init(dbpath string) error {
 	var err error
@@ -31,7 +26,7 @@ func Init(dbpath string) error {
 
 func CreateUser(name, password string) (int, error) {
 	var id int
-	var u User
+	var u models.User
 	err := db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(userBucket)
 		id64, _ := b.NextSequence()
