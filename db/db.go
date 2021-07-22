@@ -7,6 +7,7 @@ import (
 
 	"github.com/thomasschuiki/learn-go-echo/models"
 	bolt "go.etcd.io/bbolt"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var userBucket = []byte("users")
@@ -29,22 +30,59 @@ func CreateUser(name, password string) (int, error) {
 	var u models.User
 	err := db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(userBucket)
-		id64, _ := b.NextSequence()
-		id = int(id64)
-		key := itob(id)
-		u.id = id
-		u.name = name
-		u.password = password
+		u.Name = name
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), 8)
+		u.Password = string(hashedPassword)
 		user, err := json.Marshal(u)
 		if err != nil {
 			return err
 		}
-		return b.Put(key, user)
+		return b.Put([]byte(u.Name), user)
 	})
 	if err != nil {
 		return -1, err
 	}
 	return id, nil
+}
+
+func GetUser(name string) (models.User, error) {
+	var user models.User
+	err := db.View(func(t *bolt.Tx) error {
+		b := t.Bucket(userBucket)
+		v := b.Get([]byte(name))
+
+		json.Unmarshal(v, &user)
+		return nil
+	})
+	if err != nil {
+		return models.User{}, err
+	}
+	return user, nil
+}
+
+func AllUsers() ([]models.User, error) {
+	var users []models.User
+	err := db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(userBucket)
+		c := b.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			var u models.User
+			json.Unmarshal(v, &u)
+			users = append(users, u)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+func DeleteUser(key string) error {
+	return db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(userBucket)
+		return b.Delete([]byte(key))
+	})
 }
 
 func itob(v int) []byte {
